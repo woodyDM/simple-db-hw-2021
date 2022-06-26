@@ -3,7 +3,8 @@ package simpledb.storage;
 import simpledb.common.Type;
 import simpledb.execution.Predicate;
 
-import java.io.*;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 /**
  * Instance of Field that stores a single String of a fixed length.
@@ -19,13 +20,15 @@ public class StringField implements Field {
 		return value;
 	}
 
+	public StringField(String s) {
+		this(s, Type.STRING_LEN);
+	}
+
 	/**
 	 * Constructor.
-	 * 
-	 * @param s
-	 *            The value of this field.
-	 * @param maxSize
-	 *            The maximum size of this string
+	 *
+	 * @param s       The value of this field.
+	 * @param maxSize The maximum size of this string
 	 */
 	public StringField(String s, int maxSize) {
 		this.maxSize = maxSize;

@@ -1,5 +1,7 @@
 package simpledb.storage;
 
+import simpledb.common.Type;
+
 public class Util {
 
     public static int ceil(int total, int div) {
@@ -12,5 +14,9 @@ public class Util {
         long v = total / div;
         if (v * div < total) v++;
         return (int) v;
+    }
+
+    public static Field createField(Type t, String v) {
+        return t == Type.INT_TYPE ? new IntField(Integer.parseInt(v)) : new StringField(v);
     }
 }

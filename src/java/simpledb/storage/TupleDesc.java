@@ -182,7 +182,10 @@ public class TupleDesc implements Serializable {
     }
 
     private TupleDesc(){
+    }
 
+    public TupleDesc(List<Type> types,List<String> names){
+        this(types.toArray(new Type[0]), names.toArray(new String[0]));
     }
     /**
      * Merge two TupleDescs into one, with td1.numFields + td2.numFields fields,
