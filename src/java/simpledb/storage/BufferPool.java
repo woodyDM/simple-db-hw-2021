@@ -7,9 +7,9 @@ import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -29,7 +29,8 @@ public class BufferPool {
     private static final int DEFAULT_PAGE_SIZE = 4096;
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
-    private final Map<PageId, Page> pageCache = new HashMap<>();
+    private final LRUMap pageCache = new LRUMap();
+
 
     /**
      * Default number of pages passed to the constructor. This is used by
@@ -196,7 +197,9 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for (PageId pageId : pageCache.keySet()) {
+            flushPage(pageId);
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -210,20 +213,42 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        Page page = pageCache.get(pid);
+        try {
+            doFlush(page);
+            if (page != null) {
+                pageCache.remove(pid);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
     }
 
     /**
      * Flushes a certain page to disk
+     *
      * @param pid an ID indicating the page to flush
      */
-    private synchronized  void flushPage(PageId pid) throws IOException {
+    private synchronized void flushPage(PageId pid) throws IOException {
+        Page page = pageCache.get(pid);
+        doFlush(page);
         // some code goes here
         // not necessary for lab1
     }
 
-    /** Write all pages of the specified transaction to disk.
+    private void doFlush(Page page) throws IOException {
+        if (page != null && page.isDirty() != null) {
+            DbFile file = Database.getCatalog().getDatabaseFile(page.getId().getTableId());
+            file.writePage(page);
+            page.markDirty(false, null);
+        }
+    }
+
+    /**
+     * Write all pages of the specified transaction to disk.
      */
-    public synchronized  void flushPages(TransactionId tid) throws IOException {
+    public synchronized void flushPages(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
     }
@@ -232,9 +257,52 @@ public class BufferPool {
      * Discards a page from the buffer pool.
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
-    private synchronized  void evictPage() throws DbException {
+    private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        Iterator<PageId> it = pageCache.keySet().iterator();
+        if (it.hasNext()) {
+            PageId evict = it.next();
+            try {
+                flushPage(evict);
+                pageCache.remove(evict);
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.exit(0);
+            }
+        }
+    }
+
+    class LRUMap extends LinkedHashMap<PageId, Page> {
+
+        @Override
+        public Page put(PageId key, Page value) {
+            PageId evict = evict();
+            if (evict != null) {
+                try {
+                    flushPage(evict);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    System.exit(0);
+                }
+            }
+            return super.put(key, value);
+        }
+
+        public PageId evict() {
+            if (size() < Database.getBufferPool().totalPages) {
+                return null;
+            }
+            //reach max remove first
+            Iterator<PageId> iterator = keySet().iterator();
+            PageId p = null;
+            if (iterator.hasNext()) p = iterator.next();
+            if (p != null) {
+                remove(p);
+            }
+            return p;
+        }
+
     }
 
 }
