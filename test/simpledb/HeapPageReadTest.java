@@ -110,6 +110,19 @@ public class HeapPageReadTest extends SimpleDbTestBase {
         assertEquals(484, page.getNumEmptySlots());
     }
 
+    @Test
+    public void markUsed() throws IOException {
+        HeapPage page = new HeapPage(pid, EXAMPLE_DATA);
+
+        page.markSlotUsed(100,true);
+        assertTrue(page.isSlotUsed(100));
+
+        page.markSlotUsed(100,false);
+        assertFalse(page.isSlotUsed(100));
+
+        page.markSlotUsed(100,true);
+        assertTrue(page.isSlotUsed(100));
+    }
     /**
      * Unit test for HeapPage.isSlotUsed()
      */

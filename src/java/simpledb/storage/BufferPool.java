@@ -8,6 +8,7 @@ import simpledb.transaction.TransactionId;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,7 +29,6 @@ public class BufferPool {
     private static final int DEFAULT_PAGE_SIZE = 4096;
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
-    private final Map<Integer, DbFile> fileMap = new HashMap<>();
     private final Map<PageId, Page> pageCache = new HashMap<>();
 
     /**
@@ -140,7 +140,7 @@ public class BufferPool {
      * acquire a write lock on the page the tuple is added to and any other 
      * pages that are updated (Lock acquisition is not needed for lab2). 
      * May block if the lock(s) cannot be acquired.
-     * 
+     *
      * Marks any pages that were dirtied by the operation as dirty by calling
      * their markDirty bit, and adds versions of any pages that have 
      * been dirtied to the cache (replacing any existing versions of those pages) so 
@@ -151,26 +151,39 @@ public class BufferPool {
      * @param t the tuple to add
      */
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
-        throws DbException, IOException, TransactionAbortedException {
+            throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        DbFile file = Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> effectPages = file.insertTuple(tid, t);
+        _dirtyAndCachePage(tid, effectPages);
+    }
+
+    private void _dirtyAndCachePage(TransactionId tid, List<Page> effectPages) {
+        effectPages.forEach(p -> {
+            p.markDirty(true, tid);
+            pageCache.put(p.getId(), p);
+        });
     }
 
     /**
      * Remove the specified tuple from the buffer pool.
      * Will acquire a write lock on the page the tuple is removed from and any
      * other pages that are updated. May block if the lock(s) cannot be acquired.
-     *
+     * <p>
      * Marks any pages that were dirtied by the operation as dirty by calling
-     * their markDirty bit, and adds versions of any pages that have 
-     * been dirtied to the cache (replacing any existing versions of those pages) so 
-     * that future requests see up-to-date pages. 
+     * their markDirty bit, and adds versions of any pages that have
+     * been dirtied to the cache (replacing any existing versions of those pages) so
+     * that future requests see up-to-date pages.
      *
      * @param tid the transaction deleting the tuple.
-     * @param t the tuple to delete
+     * @param t   the tuple to delete
      */
-    public  void deleteTuple(TransactionId tid, Tuple t)
-        throws DbException, IOException, TransactionAbortedException {
+    public void deleteTuple(TransactionId tid, Tuple t)
+            throws DbException, IOException, TransactionAbortedException {
+        DbFile file = Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
+        List<Page> pages = file.deleteTuple(tid, t);
+        _dirtyAndCachePage(tid, pages);
         // some code goes here
         // not necessary for lab1
     }
