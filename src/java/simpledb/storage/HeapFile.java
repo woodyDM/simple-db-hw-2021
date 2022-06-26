@@ -167,7 +167,7 @@ public class HeapFile implements DbFile {
 
             @Override
             public void rewind() throws DbException, TransactionAbortedException {
-                pageIdx = -1;
+                pageIdx = 0;
                 it = null;
             }
         };

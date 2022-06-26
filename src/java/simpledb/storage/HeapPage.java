@@ -3,6 +3,7 @@ package simpledb.storage;
 import simpledb.common.Catalog;
 import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.common.EmptyIterator;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
@@ -318,6 +319,9 @@ public class HeapPage implements Page {
      */
     public Iterator<Tuple> iterator() {
         int valid = numSlots - getNumEmptySlots();
+        if (valid == 0) {
+            return new EmptyIterator<>();
+        }
         return new Iterator<Tuple>() {
             int i = 0;
             int idx = 0;

@@ -4,6 +4,7 @@ import simpledb.common.Type;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * TupleDesc describes the schema of a tuple.
@@ -11,6 +12,15 @@ import java.util.*;
 public class TupleDesc implements Serializable {
 
     private final List<TDItem> list = new ArrayList<>();
+
+    public TupleDesc addTableAlias(String tableAlias) {
+        TupleDesc result = new TupleDesc();
+        result.list.addAll(list
+                .stream()
+                .map(it -> new TDItem(it.fieldType, tableAlias + "." + it.fieldName))
+                .collect(Collectors.toList()));
+        return result;
+    }
 
     /**
      * A help class to facilitate organizing the information of each field
@@ -21,7 +31,7 @@ public class TupleDesc implements Serializable {
 
         /**
          * The type of the field
-         * */
+         */
         public final Type fieldType;
         
         /**
