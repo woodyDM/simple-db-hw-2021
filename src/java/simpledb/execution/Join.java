@@ -1,11 +1,13 @@
 package simpledb.execution;
 
-import simpledb.transaction.TransactionAbortedException;
 import simpledb.common.DbException;
+import simpledb.storage.Field;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
+import simpledb.transaction.TransactionAbortedException;
 
-import java.util.*;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * The Join operator implements the relational join operation.
@@ -13,11 +15,16 @@ import java.util.*;
 public class Join extends Operator {
 
     private static final long serialVersionUID = 1L;
+    private final JoinPredicate p;
+    private OpIterator child1;
+    private OpIterator child2;
+    private final TupleDesc combDesc;
+    private Tuple currentT1;
 
     /**
      * Constructor. Accepts two children to join and the predicate to join them
      * on
-     * 
+     *
      * @param p
      *            The predicate to use to join the children
      * @param child1
@@ -27,11 +34,15 @@ public class Join extends Operator {
      */
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
         // some code goes here
+        this.p = p;
+        this.child1 = child1;
+        this.child2 = child2;
+        this.combDesc = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
     }
 
     public JoinPredicate getJoinPredicate() {
         // some code goes here
-        return null;
+        return p;
     }
 
     /**
@@ -41,7 +52,7 @@ public class Join extends Operator {
      * */
     public String getJoinField1Name() {
         // some code goes here
-        return null;
+        return child1.getTupleDesc().getFieldName(p.getField1());
     }
 
     /**
@@ -51,7 +62,7 @@ public class Join extends Operator {
      * */
     public String getJoinField2Name() {
         // some code goes here
-        return null;
+        return child2.getTupleDesc().getFieldName(p.getField1());
     }
 
     /**
@@ -60,19 +71,30 @@ public class Join extends Operator {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        return combDesc;
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
         // some code goes here
+        super.open();
+        child1.open();
+        child2.open();
+        currentT1 = null;
     }
 
     public void close() {
         // some code goes here
+        super.close();
+        child1.close();
+        child2.close();
+        currentT1 = null;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
+        child1.rewind();
+        child2.rewind();
+        currentT1 = null;
         // some code goes here
     }
 
@@ -95,6 +117,33 @@ public class Join extends Operator {
      * @see JoinPredicate#filter
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
+
+        while (currentT1 != null || child1.hasNext()) {
+            if (currentT1 == null) {
+                currentT1 = child1.next();
+            }
+            Field f1 = currentT1.getField(p.getField1());
+            while (child2.hasNext()) {
+                Tuple t2 = child2.next();
+                Field f2 = t2.getField(p.getField2());
+                if (f1.compare(p.getOperator(), f2)) {
+                    Tuple result = new Tuple(combDesc);
+                    int i = 0;
+                    Iterator<Field> it1 = currentT1.fields();
+                    while (it1.hasNext()) {
+                        result.setField(i++, it1.next());
+                    }
+                    Iterator<Field> it2 = t2.fields();
+                    while (it2.hasNext()) {
+                        result.setField(i++, it2.next());
+                    }
+                    return result;
+                }
+            }
+            //no child2,find next
+            child2.rewind();
+            currentT1 = null;
+        }
         // some code goes here
         return null;
     }
@@ -102,12 +151,14 @@ public class Join extends Operator {
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return null;
+        return new OpIterator[]{child1, child2};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+        child1 = children[0];
+        child2 = children[1];
     }
 
 }
