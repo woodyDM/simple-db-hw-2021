@@ -2,13 +2,12 @@ package simpledb.storage;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.common.LRUMap;
 import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
@@ -29,7 +28,7 @@ public class BufferPool {
     private static final int DEFAULT_PAGE_SIZE = 4096;
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
-    private final LRUMap pageCache = new LRUMap();
+    private final LRUMap<PageId, Page> pageCache;
 
 
     /**
@@ -48,6 +47,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         this.totalPages = numPages;
+        this.pageCache = new LRUMap<>(numPages);
     }
     
     public static int getPageSize() {
@@ -260,49 +260,14 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
-        Iterator<PageId> it = pageCache.keySet().iterator();
-        if (it.hasNext()) {
-            PageId evict = it.next();
-            try {
-                flushPage(evict);
-                pageCache.remove(evict);
-            } catch (IOException e) {
-                e.printStackTrace();
-                System.exit(0);
-            }
+        Page page = pageCache.evict();
+        try {
+            flushPage(page.getId());
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(0);
         }
     }
-
-    class LRUMap extends LinkedHashMap<PageId, Page> {
-
-        @Override
-        public Page put(PageId key, Page value) {
-            PageId evict = evict();
-            if (evict != null) {
-                try {
-                    flushPage(evict);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    System.exit(0);
-                }
-            }
-            return super.put(key, value);
-        }
-
-        public PageId evict() {
-            if (size() < Database.getBufferPool().totalPages) {
-                return null;
-            }
-            //reach max remove first
-            Iterator<PageId> iterator = keySet().iterator();
-            PageId p = null;
-            if (iterator.hasNext()) p = iterator.next();
-            if (p != null) {
-                remove(p);
-            }
-            return p;
-        }
-
-    }
+ 
 
 }
