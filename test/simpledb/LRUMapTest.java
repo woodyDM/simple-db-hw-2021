@@ -27,6 +27,29 @@ public class LRUMapTest {
     }
 
     @Test
+    public void shouldRemove() {
+        LRUMap<Integer, String> map = new LRUMap<>(3);
+        map.put(1, "1");
+
+        String v = map.remove(1);
+
+        assertEquals(v,"1");
+        assertEquals(map.size(),0);
+    }
+
+    @Test
+    public void shouldRemove2() {
+        LRUMap<Integer, String> map = new LRUMap<>(3);
+        map.put(1, "1");
+        map.put(2, "2");
+
+        String v = map.remove(2);
+
+        assertEquals(v,"2");
+        assertEquals(map.size(),1);
+    }
+    
+    @Test
     public void shouldCap2() {
         LRUMap<Integer, String> map = new LRUMap<>(3);
         map.put(1, "1");

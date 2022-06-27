@@ -92,8 +92,14 @@ public class LRUMap<K, V> {
         if (node.next != null) {
             node.next.pre = node.pre;
         }
+        if (node.pre == dummyHead) {
+            tail = null;
+        } else if (node == tail) {
+            tail = node.pre;
+        }
         node.pre = null;
         node.next = null;
+
     }
 
     public V remove(K key) {
