@@ -1,14 +1,13 @@
 package simpledb.optimizer;
 
-import simpledb.common.Database;
 import simpledb.ParsingException;
+import simpledb.common.Database;
 import simpledb.execution.*;
-import simpledb.storage.TupleDesc;
-
-import java.util.*;
 
 import javax.swing.*;
-import javax.swing.tree.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import java.util.*;
 
 /**
  * The JoinOptimizer class is responsible for ordering a series of joins
@@ -129,8 +128,10 @@ public class JoinOptimizer {
             // Insert your code here.
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
+
             // nested-loops join.
-            return -1.0;
+            // costA + totalTupleOfA * costB 
+            return cost1 + card1 * cost2 + card1 * card2;
         }
     }
 
@@ -175,10 +176,23 @@ public class JoinOptimizer {
                                                    boolean t2pkey, Map<String, TableStats> stats,
                                                    Map<String, Integer> tableAliasToId) {
         int card = 1;
+        if (joinOp == Predicate.Op.EQUALS) {
+            if (t1pkey && !t2pkey) {
+                card = card2;
+            } else if (!t1pkey && t2pkey) {
+                card = card1;
+            } else if (t1pkey && t2pkey) {
+                card = Math.min(card1, card2);
+            } else {
+                card = Math.max(card1, card2);
+            }
+        } else {
+            card = (int) (0.3 * card1 * card2);
+        }
         // some code goes here
         return card <= 0 ? 1 : card;
     }
-
+ 
     /**
      * Helper method to enumerate all of the subsets of a given size of a
      * specified vector.
@@ -189,7 +203,7 @@ public class JoinOptimizer {
      *            The size of the subsets of interest
      * @return a set of all subsets of the specified size
      */
-    public <T> Set<Set<T>> enumerateSubsets(List<T> v, int size) {
+    public static <T> Set<Set<T>> enumerateSubsets(List<T> v, int size) {
         Set<Set<T>> els = new HashSet<>();
         els.add(new HashSet<>());
         // Iterator<Set> it;
@@ -235,7 +249,16 @@ public class JoinOptimizer {
             Map<String, TableStats> stats,
             Map<String, Double> filterSelectivities, boolean explain)
             throws ParsingException {
-
+        PlanCache cache = new PlanCache();
+        int j = joins.size();
+        for(int i=1;i<=j;i++){
+            double cost = Double.MAX_VALUE;
+            Set<Set<LogicalJoinNode>> allSet = enumerateSubsets(joins, i);
+            for (Set<LogicalJoinNode> s : allSet) {
+                CostCard costCard = computeCostAndCardOfSubplan(stats, filterSelectivities, null, s, cost, cache);
+                 
+            }
+        }
         // some code goes here
         //Replace the following
         return joins;

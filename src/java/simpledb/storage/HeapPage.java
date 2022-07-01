@@ -79,7 +79,8 @@ public class HeapPage implements Page {
         // some code goes here
         return (BufferPool.getPageSize() * 8) / (td.getSize() * 8 + 1);
     }
-
+    
+    
     /**
      * Computes the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      * @return the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes

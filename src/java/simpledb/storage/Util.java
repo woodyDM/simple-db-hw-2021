@@ -19,4 +19,15 @@ public class Util {
     public static Field createField(Type t, String v) {
         return t == Type.INT_TYPE ? new IntField(Integer.parseInt(v)) : new StringField(v);
     }
+
+    /**
+     * Retrieve the number of tuples on this page.
+     *
+     * @return the number of tuples on this page
+     */
+    public static int getNumTuplesPerPage(int tupleDescSize) {
+        // some code goes here
+        return (BufferPool.getPageSize() * 8) / (tupleDescSize * 8 + 1);
+    }
+    
 }

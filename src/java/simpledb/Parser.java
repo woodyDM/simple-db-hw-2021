@@ -1,11 +1,6 @@
 package simpledb;
 
 import Zql.*;
-import java.io.*;
-import java.lang.reflect.InvocationTargetException;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-
 import jline.ArgumentCompletor;
 import jline.ConsoleReader;
 import jline.SimpleCompletor;
@@ -14,6 +9,8 @@ import simpledb.common.DbException;
 import simpledb.common.Type;
 import simpledb.execution.*;
 import simpledb.optimizer.LogicalPlan;
+import simpledb.optimizer.OperatorCardinality;
+import simpledb.optimizer.QueryPlanVisualizer;
 import simpledb.optimizer.TableStats;
 import simpledb.storage.IntField;
 import simpledb.storage.StringField;
@@ -21,6 +18,13 @@ import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionId;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class Parser {
     static boolean explain = false;
@@ -290,27 +294,9 @@ public class Parser {
         query.setLogicalPlan(lp);
 
         if (physicalPlan != null) {
-            Class<?> c;
-            try {
-                c = Class.forName("simpledb.optimizer.OperatorCardinality");
-
-                Class<?> p = Operator.class;
-                Class<?> h = Map.class;
-
-                java.lang.reflect.Method m = c.getMethod(
-                        "updateOperatorCardinality", p, h, h);
-
-                System.out.println("The query plan is:");
-                m.invoke(null, physicalPlan,
-                        lp.getTableAliasToIdMapping(), TableStats.getStatsMap());
-                c = Class.forName("simpledb.optimizer.QueryPlanVisualizer");
-                m = c.getMethod(
-                        "printQueryPlanTree", OpIterator.class, System.out.getClass());
-                m.invoke(c.newInstance(), physicalPlan,System.out);
-            } catch (ClassNotFoundException | SecurityException ignored) {
-            } catch (NoSuchMethodException | InstantiationException | InvocationTargetException | IllegalAccessException | IllegalArgumentException e) {
-                e.printStackTrace();
-            }
+            System.out.println("The query plan is:");
+            OperatorCardinality.updateOperatorCardinality((Operator) physicalPlan, lp.getTableAliasToIdMapping(), TableStats.getStatsMap());
+            new QueryPlanVisualizer().printQueryPlanTree(physicalPlan, System.out);
         }
 
         return query;

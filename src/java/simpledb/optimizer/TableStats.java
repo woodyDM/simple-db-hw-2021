@@ -1,13 +1,13 @@
 package simpledb.optimizer;
 
 import simpledb.common.Database;
+import simpledb.common.DbException;
 import simpledb.common.Type;
 import simpledb.execution.Predicate;
-import simpledb.execution.SeqScan;
 import simpledb.storage.*;
-import simpledb.transaction.Transaction;
+import simpledb.transaction.TransactionAbortedException;
+import simpledb.transaction.TransactionId;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * TableStats represents statistics (e.g., histograms) about base tables in a
  * query. 
- * 
+ *
  * This class is not needed in implementing lab1 and lab2.
  */
 public class TableStats {
@@ -25,6 +25,13 @@ public class TableStats {
 
     static final int IOCOSTPERPAGE = 1000;
 
+    /**
+     * Number of bins for the histogram. Feel free to increase this value over
+     * 100, though our tests assume that you have at least 100 bins in your
+     * histograms.
+     */
+    static final int NUM_HIST_BINS = 100;
+    
     public static TableStats getTableStats(String tablename) {
         return statsMap.get(tablename);
     }
@@ -58,27 +65,28 @@ public class TableStats {
             TableStats s = new TableStats(tableid, IOCOSTPERPAGE);
             setTableStats(Database.getCatalog().getTableName(tableid), s);
         }
-        System.out.println("Done.");
+        System.out.println("Compute table stats Done.");
     }
 
-    /**
-     * Number of bins for the histogram. Feel free to increase this value over
-     * 100, though our tests assume that you have at least 100 bins in your
-     * histograms.
-     */
-    static final int NUM_HIST_BINS = 100;
+
+    private Histogram[] histograms;
+    private int size = 0;
+    private final int ioCostPerPage;
+    private final DbFile dbFile;
 
     /**
      * Create a new TableStats object, that keeps track of statistics on each
      * column of a table
-     * 
-     * @param tableid
-     *            The table over which to compute statistics
-     * @param ioCostPerPage
-     *            The cost per page of IO. This doesn't differentiate between
-     *            sequential-scan IO and disk seeks.
+     *
+     * @param tableid       The table over which to compute statistics
+     * @param ioCostPerPage The cost per page of IO. This doesn't differentiate between
+     *                      sequential-scan IO and disk seeks.
      */
+
     public TableStats(int tableid, int ioCostPerPage) {
+        this.ioCostPerPage = ioCostPerPage;
+        this.dbFile = Database.getCatalog().getDatabaseFile(tableid);
+        init();
         // For this function, you'll have to get the
         // DbFile for the table in question,
         // then scan through its tuples and calculate
@@ -89,11 +97,50 @@ public class TableStats {
         // some code goes here
     }
 
+    private void init() {
+        DbFile file = this.dbFile;
+        int colums = file.getTupleDesc().numFields();
+        DbFileIterator it = file.iterator(new TransactionId());
+
+        Stat[] stats = new Stat[colums];
+        try {
+            it.open();
+            while (it.hasNext()) {
+                Tuple t = it.next();
+                size++;
+                for (int i = 0; i < colums; i++) {
+                    if (stats[i] == null) {
+                        stats[i] = new Stat();
+                    }
+                    Field field = t.getField(i);
+                    stats[i].append(field);
+                }
+            }
+            //create histograms
+            this.histograms = new Histogram[colums];
+            for (int i = 0; i < colums; i++) {
+                this.histograms[i] = stats[i].toHistogram();
+            }
+            //scan again to estimate
+            it.rewind();
+            while (it.hasNext()) {
+                Tuple t = it.next();
+                for (int i = 0; i < colums; i++) {
+                    this.histograms[i].addValue(t.getField(i));
+                }
+            }
+            it.close();
+        } catch (DbException | TransactionAbortedException e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
+    }
+
     /**
      * Estimates the cost of sequentially scanning the file, given that the cost
      * to read a page is costPerPageIO. You can assume that there are no seeks
      * and that no pages are in the buffer pool.
-     * 
+     *
      * Also, assume that your hard drive can only read entire pages at once, so
      * if the last page of the table only has one tuple on it, it's just as
      * expensive to read as a full page. (Most real hard drives can't
@@ -103,7 +150,9 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // some code goes here
-        return 0;
+        int numTuplesPerPage = Util.getNumTuplesPerPage(dbFile.getTupleDesc().getSize());
+        int pages = Util.ceil(size, numTuplesPerPage);
+        return pages * 2 * ioCostPerPage;
     }
 
     /**
@@ -117,7 +166,7 @@ public class TableStats {
      */
     public int estimateTableCardinality(double selectivityFactor) {
         // some code goes here
-        return 0;
+        return (int) (selectivityFactor * size);
     }
 
     /**
@@ -132,6 +181,7 @@ public class TableStats {
      * */
     public double avgSelectivity(int field, Predicate.Op op) {
         // some code goes here
+        //todo ?
         return 1.0;
     }
 
@@ -150,15 +200,43 @@ public class TableStats {
      */
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
         // some code goes here
-        return 1.0;
+        return histograms[field].estimate(op, constant);
     }
 
     /**
      * return the total number of tuples in this table
-     * */
+     */
     public int totalTuples() {
         // some code goes here
-        return 0;
+        return size;
     }
+
+    static class Stat {
+        Field min;
+        Field max;
+
+        Histogram toHistogram() {
+            if (min != null) {
+                if (min.getType() == Type.INT_TYPE) {
+                    return new IntHistogram(NUM_HIST_BINS, Integer.parseInt(min.toString()), Integer.parseInt(max.toString()));
+                } else {
+                    return new StringHistogram(NUM_HIST_BINS);
+                }
+            }
+            System.err.println("WARN: histopgram empty");
+            return new StringHistogram(NUM_HIST_BINS);
+        }
+
+        void append(Field t) {
+            if (min == null) {
+                min = t;
+                max = t;
+                return;
+            }
+            if (t.compare(Predicate.Op.LESS_THAN, min)) min = t;
+            if (t.compare(Predicate.Op.GREATER_THAN, max)) max = t;
+        }
+    }
+
 
 }
